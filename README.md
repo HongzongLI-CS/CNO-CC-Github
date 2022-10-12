@@ -1,3 +1,3 @@
 # CNO-CC-Github
 
-The code of CNO-CC will published soon!
+The code of CNO-CC will publish soon!
