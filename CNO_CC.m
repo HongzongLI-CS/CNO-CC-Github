@@ -1,14 +1,4 @@
 function [] = CNO_CC()
-%% parameters setting
-POP=32;
-M=1000;
-W=1;
-C1=2;
-C2=2;
-T0=1.7;
-ALPHA=5;
-BETA=3;
-
 %% dataset setting
 id=1;
 d_name=['cc_1_d.txt'];
@@ -26,6 +16,16 @@ max_weight=max(weight);
 %% data normalization
 weight=weight/max_weight;
 capacity=capacity/max_weight;
+
+%% parameters setting
+POP=32;
+M=1000;
+W=1;
+C1=2;
+C2=2;
+T0=1.7;
+ALPHA=5;
+BETA=3;
 
 %% multi-testing
 test_times=20;
