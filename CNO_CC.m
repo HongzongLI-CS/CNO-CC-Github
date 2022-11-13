@@ -1,116 +1,95 @@
-function [] = CNO_CC()
-%% dataset setting
-id=1;
-d_name=['cc_1_d.txt'];
-weight_name=['cc_1_w.txt'];
-data_name=['cc_1_data.txt'];
-N=100;
-P=10;
+function [gbest,time,gbestx] = CNO_CC(d,weight,capacity,P,T0,ALPHA,BETA,M,POP)
+if nargin<9
+    % default parameters
+    M=1000;
+    POP=32;
+end
+if nargin<7
+    % default parameters
+    T0=2;
+    ALPHA=7;
+    BETA=7;    
+end
 
-%% load dataset
-data=load(data_name);
-[capacity,d,weight]=generate_d_w(d_name,weight_name);
-d=reshape(d,N,N);
-
-%% data normalization
-max_weight=max(weight);
-weight=weight/max_weight;
-capacity=capacity/max_weight;
-
-%% parameters setting
-POP=32;
-M=1000;
+N=length(weight);
 W=1;
 C1=2;
 C2=2;
-T0=1.7;
-ALPHA=5;
-BETA=5;
 
-%% multi-testing
-test_times=20;
-for times=0:test_times-1
-    lbestx=zeros(N*P,POP);
-    lbest=1e10*ones(1,POP);
-    gbestx=zeros(N*P,1);
-    gbest=0;
-    m=0;
-    gen=0;
-    pre_m=50;
-    lambda=zeros(P,POP);
-    time=0;
-    
-    %% generate multiple random solutions
-    x=round(rand(N*P,POP));
-    %[x] = generate_rand_feasible_solution(data,POP,P,N);
-    initialx=x;
-    initialv=unifrnd(-1,1,N*P,POP);
+lbestx=zeros(N*P,POP);
+lbest=1e10*ones(1,POP);
+gbestx=zeros(N*P,1);
+gbest=0;
+m=0;
+gen=0;
+pre_m=50;
+lambda=zeros(P,POP);
+time=0;
 
-    tic
-    while m<M
-        %% Neurodynamic models for scattered local search and determining the individual best.
-        s1=zeros(N,POP);
-        s2=zeros(P,POP);
-        t=zeros(N*P,POP);
-        for pop=1:POP
-            for i=1:N
-                for p=1:P
-                    s1(i,pop)=s1(i,pop)+initialx((i-1)*P+p,pop);
-                    if initialx((i-1)*P+p,pop)==1
-                        s2(p,pop)=s2(p,pop)+weight(i);
-                        for ii=1:N
-                            t((ii-1)*P+p,pop)=t((ii-1)*P+p,pop)+d(ii,i);
-                        end
+%% generate multiple random solutions
+x=round(rand(N*P,POP));
+%[x] = generate_rand_feasible_solution(data,POP,P,N);
+initialx=x;
+initialv=unifrnd(-1,1,N*P,POP);
+
+tic
+while m<M
+    %% Neurodynamic models for scattered local search and determining the individual best.
+    s1=zeros(N,POP);
+    s2=zeros(P,POP);
+    t=zeros(N*P,POP);
+    for pop=1:POP
+        for i=1:N
+            for p=1:P
+                s1(i,pop)=s1(i,pop)+initialx((i-1)*P+p,pop);
+                if initialx((i-1)*P+p,pop)==1
+                    s2(p,pop)=s2(p,pop)+weight(i);
+                    for ii=1:N
+                        t((ii-1)*P+p,pop)=t((ii-1)*P+p,pop)+d(ii,i);
                     end
                 end
             end
         end
-        [s1,s2,lbestx,lbest,lambda]=fully_parallel_update_GPU(P,N,POP,initialx,s1,s2,t,T0,ALPHA,BETA,lambda,d,weight,capacity,lbestx,lbest);
-        
-        %% Display the number of solutions satisfying the first and second constraints.
-        s1_num=0;
-        for pop=1:POP
-            if isempty(find(s1(:,pop)~=1))
-                s1_num=s1_num+1;
-            end
-        end
-        disp(s1_num)        
-        s2_num=POP;
-        for pop=1:POP
-            for p=1:P
-                if s2(p,pop)>capacity
-                    s2_num=s2_num-1;
-                    break
-                end
-            end
-        end
-        disp(s2_num)
-        
-        %% Determine the group's best solution        
-        [gbest,gbestx,m,pre_m,time]=generate_global_best(gbest,gbestx,lbest,lbestx,gen,m,pre_m,time);
-        
-        
-        %% Reposition the initial states by using a PSO rule
-        if m-pre_m>0
-            [pre_m,initialv,lbestx,lbest]=check_convergence(POP,N,P,pre_m,lbest,gbest,initialv,lbestx); % optional
-        else
-            initialv=W*initialv+C1*rand(1,POP).*(lbestx-initialx)+C2*rand(1,POP).*(gbestx-initialx);
-        end
-        probability=1./(1.+exp(-initialv));
-        zero_set=probability<rand(N*P,POP);
-        initialx(~zero_set)=1;
-        initialx(zero_set)=0;
-        
-        gen=gen+1;
     end
+    [s1,s2,lbestx,lbest,lambda]=fully_parallel_update_BMm_GPU(P,N,POP,initialx,s1,s2,t,T0,ALPHA,BETA,lambda,d,weight,capacity,lbestx,lbest);
     
-    %% Save results
-    pre = [cd,'/results/'];
-    filename = ['example_',num2str(id),'_cno_cc.txt'];
-    savePath = [pre,filename];
-    writematrix([gbest,time,gbestx'],savePath,'Delimiter','\t','WriteMode','append')
-    disp(['Problem ',num2str(id),' is solved!'])
+    %% Display the number of solutions satisfying the first and second constraints.
+    s1_num=0;
+    for pop=1:POP
+        if isempty(find(s1(:,pop)~=1))
+            s1_num=s1_num+1;
+        end
+    end
+    disp(s1_num)
+    s2_num=POP;
+    for pop=1:POP
+        for p=1:P
+            if s2(p,pop)>capacity
+                s2_num=s2_num-1;
+                break
+            end
+        end
+    end
+    disp(s2_num)
+    
+    %% Determine the group's best solution
+    [gbest,gbestx,m,pre_m,time]=generate_global_best(gbest,gbestx,lbest,lbestx,gen,m,pre_m,time);
+    
+    
+    %% Reposition the initial states by using a PSO rule
+    if m-pre_m>0
+        [pre_m,initialv,lbestx,lbest]=check_convergence(POP,N,P,pre_m,lbest,gbest,initialv,lbestx); % optional
+    else
+        initialv=W*initialv+C1*rand(1,POP).*(lbestx-initialx)+C2*rand(1,POP).*(gbestx-initialx);
+    end
+    probability=1./(1.+exp(-initialv));
+    zero_set=probability<rand(N*P,POP);
+    initialx(~zero_set)=1;
+    initialx(zero_set)=0;
+    
+    gen=gen+1;
 end
+
 end
 
 function [gbest,gbestx,m,pre_m,time]=generate_global_best(gbest,gbestx,lbest,lbestx,it,m,pre_m,time)
@@ -129,8 +108,8 @@ end
 fprintf('%d = %f\n',it,gbest)
 end
 
-function [s1,s2,lbestx,lbest,lambda]=fully_parallel_update_GPU(P,N,POP,initialx,s1,s2,t,T0,ALPHA,BETA,lambda,d,weight,capacity,lbestx,lbest)
-x=initialx; 
+function [s1,s2,lbestx,lbest,lambda]=fully_parallel_update_BMm_GPU(P,N,POP,initialx,s1,s2,t,T0,ALPHA,BETA,lambda,d,weight,capacity,lbestx,lbest)
+x=initialx;
 u=zeros(N*P,POP);
 %changed_num=0;
 
@@ -255,15 +234,8 @@ for pop=1:POP
     end
 end
 if (unconverage_num<3) % if a population of neurodynamic models converges, the initial_v is too large.
-    initialv=unifrnd(-1,1,N*P,POP); 
+    initialv=unifrnd(-1,1,N*P,POP);
     lbestx=zeros(N*P,POP);
     lbest=1e10*ones(1,POP);
 end
-end
-
-function [capacity,d,weight]=generate_d_w(d_name,weight_name)
-d=load(d_name);
-capacity_weight=load(weight_name);
-capacity=capacity_weight(1,1);
-weight=capacity_weight(2:end,1);
 end
