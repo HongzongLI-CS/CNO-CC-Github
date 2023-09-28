@@ -29,9 +29,9 @@ BETA=5;
 %[gbest,time,gbestx] = CNO_CC(d,weight,capacity,P);
 
 %% Save results
-pre = [cd,'/results/'];
-filename = ['example_',num2str(id),'_cno_cc.txt'];
-savePath = [pre,filename];
+%pre = [cd,'/results/'];
+filename = ['/example_',num2str(id),'_cno_cc.txt'];
+savePath = [cd,filename];
 writematrix([gbest,time,gbestx'],savePath,'Delimiter','\t','WriteMode','append')
 disp(['Problem ',num2str(id),' is solved!'])
 
